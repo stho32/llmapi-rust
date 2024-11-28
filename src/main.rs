@@ -1,37 +1,95 @@
 mod llms;
 
+use std::io::{self, Write, Read};
+use clap::{Parser, ValueEnum};
 use llms::LlmModel;
 use llms::openai::OpenAiModel;
 use llms::anthropic::AnthropicModel;
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // OpenAI examples with different models
-    let openai_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set");
-    
-    let models = vec![
-        OpenAiModel::new(openai_key.clone(), "gpt-4".to_string()),
-        OpenAiModel::new(openai_key.clone(), "gpt-3.5-turbo".to_string()),
-    ];
+#[derive(Clone, ValueEnum)]
+enum Provider {
+    OpenAI,
+    Anthropic,
+}
 
-    for model in models {
-        println!("Testing {} from {}", model.model_name(), model.provider());
-        let response = model.query("Hello, how are you?").await?;
-        println!("Response: {}\n", response);
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    /// Mode to run in (chat or api)
+    #[arg(value_enum)]
+    mode: Mode,
+
+    /// LLM provider to use
+    #[arg(value_enum)]
+    provider: Provider,
+
+    /// Model name to use
+    #[arg(long)]
+    model: String,
+}
+
+#[derive(Clone, ValueEnum)]
+enum Mode {
+    Chat,
+    Api,
+}
+
+fn create_model(provider: Provider, model: String) -> Box<dyn LlmModel> {
+    match provider {
+        Provider::OpenAI => {
+            let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set");
+            Box::new(OpenAiModel::new(api_key, model))
+        }
+        Provider::Anthropic => {
+            let api_key = std::env::var("ANTHROPIC_API_KEY").expect("ANTHROPIC_API_KEY must be set");
+            Box::new(AnthropicModel::new(api_key, model))
+        }
+    }
+}
+
+async fn chat_mode(model: Box<dyn LlmModel>) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Starting chat with {} from {}. Type 'exit' to quit.", 
+             model.model_name(), model.provider());
+    
+    loop {
+        print!("> ");
+        io::stdout().flush()?;
+        
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        
+        let input = input.trim();
+        if input == "exit" {
+            break;
+        }
+        
+        let response = model.query(input).await?;
+        println!("\n{}\n", response);
     }
     
-    // Anthropic examples with different models
-    let anthropic_key = std::env::var("ANTHROPIC_API_KEY").expect("ANTHROPIC_API_KEY must be set");
-    
-    let models = vec![
-        AnthropicModel::new(anthropic_key.clone(), "claude-3-opus-20240229".to_string()),
-        AnthropicModel::new(anthropic_key.clone(), "claude-3-sonnet-20240229".to_string()),
-    ];
+    Ok(())
+}
 
-    for model in models {
-        println!("Testing {} from {}", model.model_name(), model.provider());
-        let response = model.query("Hello, how are you?").await?;
-        println!("Response: {}\n", response);
+async fn api_mode(model: Box<dyn LlmModel>) -> Result<(), Box<dyn std::error::Error>> {
+    println!("API mode: Reading from stdin, writing to stdout");
+    let mut input = String::new();
+    io::stdin().read_to_string(&mut input)?;
+    
+    let response = model.query(&input).await?;
+    println!("{}", response);
+    
+    Ok(())
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let cli = Cli::parse();
+    
+    let model = create_model(cli.provider, cli.model);
+    
+    match cli.mode {
+        Mode::Chat => chat_mode(model).await?,
+        Mode::Api => api_mode(model).await?,
     }
     
     Ok(())
