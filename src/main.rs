@@ -5,6 +5,13 @@ use clap::{Parser, ValueEnum};
 use llms::LlmModel;
 use llms::openai::OpenAiModel;
 use llms::anthropic::AnthropicModel;
+use axum::{
+    routing::post,
+    Router,
+    Json,
+    extract::State,
+};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, ValueEnum)]
 enum Provider {
@@ -70,15 +77,39 @@ async fn chat_mode(model: Box<dyn LlmModel>) -> Result<(), Box<dyn std::error::E
     Ok(())
 }
 
+#[derive(Deserialize)]
+struct ChatRequest {
+    message: String,
+}
+
+#[derive(Serialize)]
+struct ChatResponse {
+    response: String,
+}
+
 async fn api_mode(model: Box<dyn LlmModel>) -> Result<(), Box<dyn std::error::Error>> {
-    println!("API mode: Reading from stdin, writing to stdout");
-    let mut input = String::new();
-    io::stdin().read_to_string(&mut input)?;
+    let model = std::sync::Arc::new(model);
     
-    let response = model.query(&input).await?;
-    println!("{}", response);
+    let app = Router::new()
+        .route("/chat", post(handle_chat))
+        .with_state(model);
+
+    println!("Starting API server on http://localhost:3000");
+    axum::Server::bind(&"0.0.0.0:3000".parse()?)
+        .serve(app.into_make_service())
+        .await?;
     
     Ok(())
+}
+
+async fn handle_chat(
+    State(model): State<std::sync::Arc<Box<dyn LlmModel>>>,
+    Json(request): Json<ChatRequest>,
+) -> Json<ChatResponse> {
+    let response = model.query(&request.message).await
+        .unwrap_or_else(|e| format!("Error: {}", e));
+    
+    Json(ChatResponse { response })
 }
 
 #[tokio::main]
