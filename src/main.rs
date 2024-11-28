@@ -1,6 +1,6 @@
 mod llms;
 
-use std::io::{self, Write, Read};
+use std::io::{self, Write};
 use clap::{Parser, ValueEnum};
 use llms::LlmModel;
 use llms::openai::OpenAiModel;
@@ -90,14 +90,16 @@ struct ChatResponse {
 async fn api_mode(model: Box<dyn LlmModel>) -> Result<(), Box<dyn std::error::Error>> {
     let model = std::sync::Arc::new(model);
     
-    let app = Router::new()
+    let router = Router::new()
         .route("/chat", post(handle_chat))
         .with_state(model);
 
+    let address = "0.0.0.0:3000".parse::<std::net::SocketAddr>()?;
     println!("Starting API server on http://localhost:3000");
-    axum::Server::bind(&"0.0.0.0:3000".parse()?)
-        .serve(app.into_make_service())
-        .await?;
+    axum::serve(
+        tokio::net::TcpListener::bind(address).await?, 
+        router
+        ).await?;
     
     Ok(())
 }
