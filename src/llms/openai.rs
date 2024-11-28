@@ -38,11 +38,11 @@ struct OpenAIResponse {
 }
 
 impl OpenAiModel {
-    pub fn new(api_key: String) -> Self {
+    pub fn new(api_key: String, model: String) -> Self {
         Self {
             client: Client::new(),
             api_key,
-            model: String::from("gpt-4"),
+            model,
         }
     }
 }
@@ -50,7 +50,7 @@ impl OpenAiModel {
 #[async_trait]
 impl LlmModel for OpenAiModel {
     fn model_name(&self) -> &str {
-        "GPT-4"
+        &self.model
     }
 
     fn provider(&self) -> &str {

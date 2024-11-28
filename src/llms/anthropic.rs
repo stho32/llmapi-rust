@@ -33,11 +33,11 @@ struct AnthropicResponse {
 }
 
 impl AnthropicModel {
-    pub fn new(api_key: String) -> Self {
+    pub fn new(api_key: String, model: String) -> Self {
         Self {
             client: Client::new(),
             api_key,
-            model: String::from("claude-3-sonnet-20240229"),
+            model,
         }
     }
 }
@@ -45,7 +45,7 @@ impl AnthropicModel {
 #[async_trait]
 impl LlmModel for AnthropicModel {
     fn model_name(&self) -> &str {
-        "Claude 3 Sonnet"
+        &self.model
     }
 
     fn provider(&self) -> &str {
