@@ -22,7 +22,13 @@ const SERVICE_NAME: &str = "LlmApiService";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 
 #[cfg(windows)]
-pub fn run() -> windows_service::Result<()> {
+static mut SERVICE_PORT: u16 = 3000; // Default port
+
+#[cfg(windows)]
+pub fn run(port: u16) -> windows_service::Result<()> {
+    unsafe {
+        SERVICE_PORT = port;
+    }
     service_dispatcher::start(SERVICE_NAME, ffi_service_main)
 }
 
@@ -61,13 +67,14 @@ fn run_service(_arguments: Vec<OsString>) -> windows_service::Result<()> {
         process_id: None,
     })?;
 
-    // Start API server in service context
+    // Start the API server with the specified port
     let runtime = tokio::runtime::Runtime::new().unwrap();
+    let models = ModelCollection::new();
+    let port = unsafe { SERVICE_PORT };
+    
     runtime.block_on(async {
-        let models = ModelCollection::new();
-        let config = crate::config::Config::load();
-        if let Err(e) = crate::modes::api::run(models, config.port).await {
-            eprintln!("API server error: {}", e);
+        if let Err(e) = crate::modes::api::run(models, port).await {
+            eprintln!("Service error: {}", e);
         }
     });
 

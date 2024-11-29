@@ -14,8 +14,12 @@ struct Cli {
     mode: Mode,
 
     /// Set the port number for the API server
-    #[arg(long = "set-port")]
+    #[arg(long = "port")]
     port: Option<u16>,
+
+    /// Set the port number in config file
+    #[arg(long = "set-port")]
+    set_port: Option<u16>,
 }
 
 #[derive(Clone, ValueEnum)]
@@ -31,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     
     // Handle port configuration if specified
-    if let Some(port) = cli.port {
+    if let Some(port) = cli.set_port {
         let config = Config { port };
         config.save()?;
         println!("Port configuration saved. API will now use port {}", port);
@@ -41,11 +45,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let models = ModelCollection::new();
     let config = Config::load();
     
+    // Use CLI port if specified, otherwise use config port
+    let port = cli.port.unwrap_or(config.port);
+    
     match cli.mode {
         Mode::Chat => modes::chat::run(models).await?,
-        Mode::Api => modes::api::run(models, config.port).await?,
+        Mode::Api => modes::api::run(models, port).await?,
         #[cfg(windows)]
-        Mode::Service => modes::service::run()?,
+        Mode::Service => modes::service::run(port)?,
     }
     
     Ok(())

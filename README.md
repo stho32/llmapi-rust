@@ -29,7 +29,8 @@ Modes:
   service  Run as Windows service
 
 Options:
-  --set-port <PORT>  Set the port number for the API server
+  --port <PORT>     Set the port number for the current session
+  --set-port <PORT> Save the port number in config for future sessions
   -h, --help        Print help
   -V, --version     Print version
 ```
@@ -72,10 +73,12 @@ I'm doing well, thank you for asking...
 Start the API server:
 
 ```bash
-llmapi-rust api [--set-port <PORT>]
+llmapi-rust api [--port <PORT>]
 ```
 
-The server runs by default on port 3000. You can change the port using the `--set-port` option.
+The server runs by default on port 3000. You can:
+- Use `--port` to set the port for the current session
+- Use `--set-port` to save the port in config for future sessions
 
 ### Windows Service Mode
 
@@ -86,26 +89,37 @@ Run the API server as a Windows service that starts automatically with Windows:
 cargo build --release
 ```
 
-2. Install the service (requires administrator privileges):
+2. Install or manage the service (requires administrator privileges):
 ```powershell
-.\install-service.ps1
+# Install service (default port 3000)
+.\manage-service.ps1 -Action install
+
+# Install with custom port
+.\manage-service.ps1 -Action install -Port 8080
+
+# Install with manual startup
+.\manage-service.ps1 -Action install -StartupType Manual
+
+# Uninstall service
+.\manage-service.ps1 -Action uninstall
+
+# Reinstall service (uninstall + install)
+.\manage-service.ps1 -Action reinstall
+
+# Install using custom executable path
+.\manage-service.ps1 -Action install -CustomPath "C:\path\to\llm-api.exe"
 ```
 
-3. Start the service:
+The service can be managed through PowerShell commands:
 ```powershell
+# Start the service
 Start-Service LlmApiService
-```
 
-The service can be managed through Windows Service Manager or PowerShell commands:
-```powershell
 # Check service status
 Get-Service LlmApiService
 
-# Stop service
+# Stop the service
 Stop-Service LlmApiService
-
-# Remove service
-Remove-Service LlmApiService
 ```
 
 ## API Endpoints
