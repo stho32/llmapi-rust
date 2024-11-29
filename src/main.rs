@@ -22,6 +22,7 @@ struct Cli {
 enum Mode {
     Chat,
     Api,
+    #[cfg(windows)]
     Service,
 }
 
@@ -43,6 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match cli.mode {
         Mode::Chat => modes::chat::run(models).await?,
         Mode::Api => modes::api::run(models, config.port).await?,
+        #[cfg(windows)]
         Mode::Service => modes::service::run()?,
     }
     

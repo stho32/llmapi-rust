@@ -1,7 +1,9 @@
+#[cfg(windows)]
 use std::{
     ffi::OsString,
     time::Duration,
 };
+#[cfg(windows)]
 use windows_service::{
     define_windows_service,
     service::{
@@ -11,17 +13,23 @@ use windows_service::{
     service_control_handler::{self, ServiceControlHandlerResult},
     service_dispatcher,
 };
+#[cfg(windows)]
 use crate::llms::model_collection::ModelCollection;
 
+#[cfg(windows)]
 const SERVICE_NAME: &str = "LlmApiService";
+#[cfg(windows)]
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 
+#[cfg(windows)]
 pub fn run() -> windows_service::Result<()> {
     service_dispatcher::start(SERVICE_NAME, ffi_service_main)
 }
 
+#[cfg(windows)]
 define_windows_service!(ffi_service_main, service_main);
 
+#[cfg(windows)]
 fn service_main(arguments: Vec<OsString>) {
     if let Err(e) = run_service(arguments) {
         // TODO: Implement proper error logging
@@ -29,6 +37,7 @@ fn service_main(arguments: Vec<OsString>) {
     }
 }
 
+#[cfg(windows)]
 fn run_service(_arguments: Vec<OsString>) -> windows_service::Result<()> {
     let event_handler = move |control_event| -> ServiceControlHandlerResult {
         match control_event {
