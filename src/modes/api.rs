@@ -31,7 +31,7 @@ pub struct ModelInfo {
     pub provider: String,
 }
 
-pub async fn run(models: ModelCollection) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(models: ModelCollection, port: u16) -> Result<(), Box<dyn std::error::Error>> {
     let models = Arc::new(models);
     
     let router = Router::new()
@@ -39,8 +39,8 @@ pub async fn run(models: ModelCollection) -> Result<(), Box<dyn std::error::Erro
         .route("/models", get(handle_list_models))
         .with_state(models);
 
-    let address = "0.0.0.0:3000".parse::<std::net::SocketAddr>()?;
-    println!("Starting API server on http://localhost:3000");
+    let address = format!("0.0.0.0:{}", port).parse::<std::net::SocketAddr>()?;
+    println!("Starting API server on http://localhost:{}", port);
     axum::serve(
         tokio::net::TcpListener::bind(address).await?, 
         router
