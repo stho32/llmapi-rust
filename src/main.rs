@@ -6,7 +6,7 @@ use llms::LlmModel;
 use llms::openai::OpenAiModel;
 use llms::anthropic::AnthropicModel;
 use axum::{
-    routing::post,
+    routing::{post, get},
     Router,
     Json,
     extract::State,
@@ -78,20 +78,28 @@ async fn chat_mode(model: Box<dyn LlmModel>) -> Result<(), Box<dyn std::error::E
 }
 
 #[derive(Deserialize)]
-struct ChatRequest {
-    message: String,
+struct QueryRequest {
+    model_name: String,
+    prompt: String,
 }
 
 #[derive(Serialize)]
-struct ChatResponse {
+struct QueryResponse {
     response: String,
+}
+
+#[derive(Serialize)]
+struct ModelInfo {
+    model_name: String,
+    provider: String,
 }
 
 async fn api_mode(model: Box<dyn LlmModel>) -> Result<(), Box<dyn std::error::Error>> {
     let model = std::sync::Arc::new(model);
     
     let router = Router::new()
-        .route("/chat", post(handle_chat))
+        .route("/query", post(handle_query))
+        .route("/models", get(handle_list_models))
         .with_state(model);
 
     let address = "0.0.0.0:3000".parse::<std::net::SocketAddr>()?;
@@ -99,19 +107,30 @@ async fn api_mode(model: Box<dyn LlmModel>) -> Result<(), Box<dyn std::error::Er
     axum::serve(
         tokio::net::TcpListener::bind(address).await?, 
         router
-        ).await?;
+    ).await?;
     
     Ok(())
 }
 
-async fn handle_chat(
+async fn handle_query(
     State(model): State<std::sync::Arc<Box<dyn LlmModel>>>,
-    Json(request): Json<ChatRequest>,
-) -> Json<ChatResponse> {
-    let response = model.query(&request.message).await
+    Json(request): Json<QueryRequest>,
+) -> Json<QueryResponse> {
+    // TODO: Add model selection logic based on request.model_name
+    let response = model.query(&request.prompt).await
         .unwrap_or_else(|e| format!("Error: {}", e));
     
-    Json(ChatResponse { response })
+    Json(QueryResponse { response })
+}
+
+async fn handle_list_models(
+    State(model): State<std::sync::Arc<Box<dyn LlmModel>>>,
+) -> Json<Vec<ModelInfo>> {
+    // For now, just return the single configured model
+    Json(vec![ModelInfo {
+        model_name: model.model_name().to_string(),
+        provider: model.provider().to_string(),
+    }])
 }
 
 #[tokio::main]
