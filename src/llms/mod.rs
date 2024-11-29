@@ -1,5 +1,6 @@
 pub mod openai;
 pub mod anthropic;
+pub mod model_collection;
 
 use async_trait::async_trait;
 
