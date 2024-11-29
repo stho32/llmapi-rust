@@ -4,10 +4,11 @@ use std::{
     time::Duration,
     path::PathBuf,
     fs::OpenOptions,
+    sync::atomic::{AtomicBool, Ordering},
 };
 
 #[cfg(windows)]
-use log::{info, error, warn};
+use log::{info, error};
 #[cfg(windows)]
 use simplelog::{WriteLogger, LevelFilter, Config};
 #[cfg(windows)]
@@ -30,6 +31,9 @@ const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 
 #[cfg(windows)]
 static mut SERVICE_PORT: u16 = 3000; // Default port
+
+#[cfg(windows)]
+static SERVICE_RUNNING: AtomicBool = AtomicBool::new(true);
 
 #[cfg(windows)]
 fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
@@ -85,31 +89,22 @@ fn service_main(arguments: Vec<OsString>) {
 #[cfg(windows)]
 fn run_service(_arguments: Vec<OsString>) -> windows_service::Result<()> {
     info!("Initializing service control handler");
-    let event_handler = move |control_event| -> ServiceControlHandlerResult {
+    
+    // Create the status handle first
+    let status_handle = service_control_handler::register(SERVICE_NAME, move |control_event| -> ServiceControlHandlerResult {
         match control_event {
             ServiceControl::Stop => {
                 info!("Service stop requested");
+                // Signal the service to stop
+                SERVICE_RUNNING.store(false, Ordering::SeqCst);
                 ServiceControlHandlerResult::NoError
             }
-            _ => {
-                warn!("Received unsupported service control command");
-                ServiceControlHandlerResult::NotImplemented
-            }
+            _ => ServiceControlHandlerResult::NotImplemented
         }
-    };
+    })?;
 
-    let status_handle = match service_control_handler::register(SERVICE_NAME, event_handler) {
-        Ok(handle) => {
-            info!("Service control handler registered");
-            handle
-        }
-        Err(e) => {
-            error!("Failed to register service control handler: {}", e);
-            return Err(windows_service::Error::LaunchArgumentsNotSupported);
-        }
-    };
-
-    if let Err(e) = status_handle.set_service_status(ServiceStatus {
+    // Set initial status to running
+    status_handle.set_service_status(ServiceStatus {
         service_type: SERVICE_TYPE,
         current_state: ServiceState::Running,
         controls_accepted: ServiceControlAccept::STOP,
@@ -117,32 +112,65 @@ fn run_service(_arguments: Vec<OsString>) -> windows_service::Result<()> {
         checkpoint: 0,
         wait_hint: Duration::default(),
         process_id: None,
-    }) {
-        error!("Failed to set service status: {}", e);
-        return Err(windows_service::Error::LaunchArgumentsNotSupported);
-    }
+    })?;
+
     info!("Service status set to running");
 
     // Start the API server with the specified port
-    let runtime = match tokio::runtime::Runtime::new() {
-        Ok(rt) => rt,
-        Err(e) => {
-            error!("Failed to create Tokio runtime: {}", e);
-            return Err(windows_service::Error::LaunchArgumentsNotSupported);
-        }
-    };
+    let runtime = tokio::runtime::Runtime::new()
+        .map_err(|_e| windows_service::Error::LaunchArgumentsNotSupported)?;
     
     let models = ModelCollection::new();
     let port = unsafe { SERVICE_PORT };
     
     info!("Starting API server on port {}", port);
-    runtime.block_on(async {
+    
+    // Create a shutdown signal
+    let (shutdown_tx, _shutdown_rx) = tokio::sync::oneshot::channel();
+    
+    // Spawn the API server task
+    let server_handle = runtime.spawn(async move {
         if let Err(e) = crate::modes::api::run(models, port).await {
             error!("API server error: {}", e);
             eprintln!("API server error: {}", e);
         }
     });
 
-    info!("Service shutting down");
+    // Wait for stop signal
+    while SERVICE_RUNNING.load(Ordering::SeqCst) {
+        std::thread::sleep(Duration::from_millis(100));
+        
+        // Update status to stopping when stop is requested
+        if !SERVICE_RUNNING.load(Ordering::SeqCst) {
+            let _ = status_handle.set_service_status(ServiceStatus {
+                service_type: SERVICE_TYPE,
+                current_state: ServiceState::StopPending,
+                controls_accepted: ServiceControlAccept::empty(),
+                exit_code: ServiceExitCode::Win32(0),
+                checkpoint: 0,
+                wait_hint: Duration::from_secs(10),
+                process_id: None,
+            });
+        }
+    }
+
+    // Send shutdown signal and wait for server to stop
+    let _ = shutdown_tx.send(());
+    runtime.block_on(async {
+        let _ = server_handle.await;
+    });
+
+    // Update service status to stopped
+    status_handle.set_service_status(ServiceStatus {
+        service_type: SERVICE_TYPE,
+        current_state: ServiceState::Stopped,
+        controls_accepted: ServiceControlAccept::empty(),
+        exit_code: ServiceExitCode::Win32(0),
+        checkpoint: 0,
+        wait_hint: Duration::default(),
+        process_id: None,
+    })?;
+
+    info!("Service stopped successfully");
     Ok(())
 }
