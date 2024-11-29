@@ -6,7 +6,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  BINARY_NAME: llm-cli # Update this if your binary name is different
+  BINARY_NAME: llmapi-rust
 
 jobs:
   build-and-release:
