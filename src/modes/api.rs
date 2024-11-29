@@ -9,19 +9,25 @@ use std::sync::Arc;
 use crate::llms::model_collection::ModelCollection;
 
 #[derive(Deserialize)]
+#[serde(rename_all = "PascalCase")]
 pub struct QueryRequest {
+    #[serde(alias = "model_name")]
     pub model_name: String,
+    #[serde(alias = "prompt")]
     pub prompt: String,
 }
 
 #[derive(Serialize)]
 pub struct QueryResponse {
+    #[serde(rename = "Response")]
     pub response: String,
 }
 
 #[derive(Serialize)]
 pub struct ModelInfo {
+    #[serde(rename = "ModelName")]
     pub model_name: String,
+    #[serde(rename = "Provider")]
     pub provider: String,
 }
 

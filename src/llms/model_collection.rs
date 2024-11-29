@@ -18,15 +18,15 @@ impl ModelCollection {
                 Box::new(OpenAiModel::new(api_key.clone(), "gpt-4o".to_string()))
             );
             models.insert(
-                "gpt-3.5-turbo".to_string(),
-                Box::new(OpenAiModel::new(api_key, "gpt-3.5-turbo".to_string()))
+                "gpt-4o-mini".to_string(),
+                Box::new(OpenAiModel::new(api_key, "gpt-4o-mini".to_string()))
             );
         }
         
         // Anthropic Models
         if let Ok(api_key) = std::env::var("ANTHROPIC_API_KEY") {
             models.insert(
-                "claude-3-sonnet".to_string(),
+                "Sonnet 3.5".to_string(),
                 Box::new(AnthropicModel::new(api_key.clone(), "claude-3-5-sonnet-latest".to_string()))
             );
         }
