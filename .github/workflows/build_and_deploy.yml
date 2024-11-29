@@ -6,7 +6,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  BINARY_NAME: llmapi-rust
+  BINARY_NAME: llm-api
 
 jobs:
   build-and-release:
