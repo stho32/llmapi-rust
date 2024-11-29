@@ -22,6 +22,7 @@ struct Cli {
 enum Mode {
     Chat,
     Api,
+    Service,
 }
 
 #[tokio::main]
@@ -42,6 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match cli.mode {
         Mode::Chat => modes::chat::run(models).await?,
         Mode::Api => modes::api::run(models, config.port).await?,
+        Mode::Service => modes::service::run()?,
     }
     
     Ok(())

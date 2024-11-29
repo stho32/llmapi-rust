@@ -18,10 +18,15 @@ Set the following environment variables for the LLMs you want to use:
 
 ## Usage
 
-The application can be run in two modes: chat (interactive) or api (server).
+The application can be run in three modes: chat (interactive), api (server), or service (Windows service).
 
 ```bash
 llmapi-rust <mode> [options]
+
+Modes:
+  chat     Start interactive chat session
+  api      Start API server
+  service  Run as Windows service
 
 Options:
   --set-port <PORT>  Set the port number for the API server
@@ -71,6 +76,37 @@ llmapi-rust api [--set-port <PORT>]
 ```
 
 The server runs by default on port 3000. You can change the port using the `--set-port` option.
+
+### Windows Service Mode
+
+Run the API server as a Windows service that starts automatically with Windows:
+
+1. Build the release version:
+```bash
+cargo build --release
+```
+
+2. Install the service (requires administrator privileges):
+```powershell
+.\install-service.ps1
+```
+
+3. Start the service:
+```powershell
+Start-Service LlmApiService
+```
+
+The service can be managed through Windows Service Manager or PowerShell commands:
+```powershell
+# Check service status
+Get-Service LlmApiService
+
+# Stop service
+Stop-Service LlmApiService
+
+# Remove service
+Remove-Service LlmApiService
+```
 
 ## API Endpoints
 
