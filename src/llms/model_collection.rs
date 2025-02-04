@@ -19,7 +19,11 @@ impl ModelCollection {
             );
             models.insert(
                 "gpt-4o-mini".to_string(),
-                Box::new(OpenAiModel::new(api_key, "gpt-4o-mini".to_string()))
+                Box::new(OpenAiModel::new(api_key.clone(), "gpt-4o-mini".to_string()))
+            );
+            models.insert(
+                "o3-mini".to_string(),
+                Box::new(OpenAiModel::new(api_key, "o3-mini".to_string()))
             );
         }
         
