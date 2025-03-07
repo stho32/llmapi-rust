@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use crate::llms::LlmModel;
+use tokio::time;
 
 pub struct AnthropicModel {
     client: Client,
@@ -62,7 +63,7 @@ impl LlmModel for AnthropicModel {
             max_tokens: 1024,
         };
 
-        let response = self.client
+        let mut response = self.client
             .post("https://api.anthropic.com/v1/messages")
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
@@ -71,9 +72,19 @@ impl LlmModel for AnthropicModel {
             .send()
             .await?;
 
-        // Handle potential 529 error with one retry
-        if response.status() == 529 {
-            let response = self.client
+        // Retry up to 10 times if we get a 529 status code
+        let mut attempts = 1;
+        const MAX_ATTEMPTS: u8 = 10;
+
+        while response.status() == 529 && attempts < MAX_ATTEMPTS {
+            // Wait for 2 seconds before retrying
+            time::sleep(time::Duration::from_secs(2)).await;
+            
+            // Log retry attempt
+            eprintln!("Anthropic API returned 529, retrying (attempt {}/{})...", attempts, MAX_ATTEMPTS-1);
+            
+            // Retry the request
+            response = self.client
                 .post("https://api.anthropic.com/v1/messages")
                 .header("x-api-key", &self.api_key)
                 .header("anthropic-version", "2023-06-01")
@@ -81,8 +92,18 @@ impl LlmModel for AnthropicModel {
                 .json(&request)
                 .send()
                 .await?;
-            response.error_for_status()?;
+                
+            attempts += 1;
         }
+
+        // If we still have a 529 after all attempts, make the error more descriptive
+        if response.status() == 529 {
+            return Err(format!("Anthropic API returned 529 status code after {} attempts. Service is likely overloaded.", MAX_ATTEMPTS).into());
+        }
+
+        // Check for other errors
+        // Note: error_for_status() consumes response and returns it if status is success
+        response = response.error_for_status()?;
 
         let response_data: AnthropicResponse = response.json().await?;
         
